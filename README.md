@@ -10,11 +10,11 @@ CounselorAI is a web application built with Next.js and Firebase Genkit that pro
 
 | Step 1: Enter Names | Step 2: Answer Questions |
 | :---: | :---: |
-| ![Enter Names](https://placehold.co/400x300/F5F5F5/333333?text=Name+Input+Screen) | ![Answer Questions](https://placehold.co/400x300/F5F5F5/333333?text=Question+Screen) |
+| ![Enter Names](home.png) | ![Answer Questions](advice.png) |
 
 | Step 3: Interactive Chat | Step 4: Action Plan |
 | :---: | :---: |
-| ![Interactive Chat](https://placehold.co/400x300/F5F5F5/333333?text=Chat+Interface) | ![Action Plan](https://placehold.co/400x300/F5F5F5/333333?text=Action+Plan+View) |
+| ![Interactive Chat](conversation.png) | ![Action Plan](actionplan.png) |
 
 
 ## Tech Stack
