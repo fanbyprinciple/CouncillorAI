@@ -24,6 +24,7 @@ import {
   ListChecks,
   ArrowLeft,
   ArrowRight,
+  FileDown,
 } from 'lucide-react';
 import {getAIAdvice, getFollowUpQuestions, getActionableSteps} from './actions';
 import {cn} from '@/lib/utils';
@@ -31,6 +32,8 @@ import {useToast} from '@/hooks/use-toast';
 import {Textarea} from '@/components/ui/textarea';
 import {Label} from '@/components/ui/label';
 import {Progress} from '@/components/ui/progress';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 type Message = {
   id: number;
@@ -59,6 +62,7 @@ export function ChatClient() {
   const [isPending, startTransition] = useTransition();
   const {toast} = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -210,6 +214,57 @@ export function ChatClient() {
         });
       } else if (result.advice) {
         setMessages(prev => [...prev, {id: Date.now() + 1, user: 'AI', text: result.advice}]);
+      }
+    });
+  };
+
+  const handleDownloadPdf = () => {
+    const chatContainer = chatContainerRef.current;
+    if (!chatContainer) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not find chat content to download.',
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const canvas = await html2canvas(chatContainer, {
+          scale: 2, // Higher scale for better quality
+        });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = imgWidth / imgHeight;
+        const width = pdfWidth;
+        const height = width / ratio;
+
+        let position = 0;
+        let heightLeft = height;
+
+        pdf.addImage(imgData, 'PNG', 0, position, width, height);
+        heightLeft -= pdfHeight;
+
+        while (heightLeft > 0) {
+          position = heightLeft - height;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 0, position, width, height);
+          heightLeft -= pdfHeight;
+        }
+
+        pdf.save('CounselorAI-Chat-History.pdf');
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        toast({
+          variant: 'destructive',
+          title: 'PDF Generation Failed',
+          description: 'An error occurred while creating the PDF.',
+        });
       }
     });
   };
@@ -373,16 +428,26 @@ export function ChatClient() {
             )}
 
             {(appState === 'advice' || appState === 'ended') && (
-              <div className="space-y-6 flex-1">
+              <div className="space-y-6 flex-1" ref={chatContainerRef}>
                 {messages.map(message => (
                   <ChatMessage key={message.id} message={message} userAName={userAName} userBName={userBName} />
                 ))}
                 {appState === 'ended' && (
-                  <div className="text-center p-4 bg-primary/10 rounded-lg">
-                    <p className="font-semibold text-primary">The session has ended.</p>
-                    <p className="text-sm text-muted-foreground">
-                      We hope this conversation was helpful. You can start over to begin a new session.
-                    </p>
+                  <div className="text-center p-4 bg-primary/10 rounded-lg space-y-4">
+                    <div>
+                      <p className="font-semibold text-primary">The session has ended.</p>
+                      <p className="text-sm text-muted-foreground">
+                        We hope this conversation was helpful. You can start over to begin a new session.
+                      </p>
+                    </div>
+                    <Button onClick={handleDownloadPdf} disabled={isPending}>
+                      {isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="mr-2 h-4 w-4" />
+                      )}
+                      Download PDF
+                    </Button>
                   </div>
                 )}
               </div>
@@ -454,7 +519,7 @@ function ChatMessage({message, userAName, userBName}: {message: Message; userANa
       <div className={cn('flex flex-col gap-1', isUser && 'items-end')}>
         <div
           className={cn(
-            'p-4 rounded-xl max-w-xl text-sm shadow-md break-words',
+            'p-4 rounded-xl max-w-xl shadow-md break-words',
             (isAI || isActionPlan) && 'bg-accent/30 border border-accent/50',
             isUser && 'bg-primary/20'
           )}
