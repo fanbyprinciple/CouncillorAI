@@ -20,6 +20,7 @@ import {
   HeartHandshake,
   MessageSquareQuote,
   FileQuestion,
+  User,
 } from 'lucide-react';
 import { getAIAdvice, getInitialQuestions } from './actions';
 import { cn } from '@/lib/utils';
@@ -29,7 +30,7 @@ import { Label } from '@/components/ui/label';
 
 type Message = {
   id: number;
-  user: 'AI' | 'System';
+  user: string;
   text: string;
 };
 
@@ -41,6 +42,10 @@ export function ChatClient() {
   const [topic, setTopic] = useState('');
   const [questions, setQuestions] = useState<string[]>([]);
   const [answers, setAnswers] = useState<Answers>({});
+  const [userAName, setUserAName] = useState('User A');
+  const [userBName, setUserBName] = useState('User B');
+  const [input, setInput] = useState('');
+  const [activeUser, setActiveUser] = useState<string | null>(null);
   const [appState, setAppState] = useState<AppState>('topic');
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
@@ -75,8 +80,8 @@ export function ChatClient() {
       } else if (result.questions) {
         setQuestions(result.questions);
         setAppState('questions');
-        setAnswers({}); // Reset answers
-        setMessages([]); // Reset messages
+        setAnswers({});
+        setMessages([]);
       }
     });
   };
@@ -107,16 +112,23 @@ export function ChatClient() {
     });
   };
 
-  const handleGetAdvice = () => {
-    let context = `Topic: ${topic}\n\n`;
+  const getFullChatHistory = () => {
+    let history = `Topic: ${topic}\n\n`;
     questions.forEach((q, index) => {
-      context += `Question ${index + 1}: ${q}\n`;
-      context += `User A Answer: ${answers[index]?.A || 'No answer'}\n`;
-      context += `User B Answer: ${answers[index]?.B || 'No answer'}\n\n`;
+      history += `Question ${index + 1}: ${q}\n`;
+      history += `${userAName}'s Answer: ${answers[index]?.A || 'No answer'}\n`;
+      history += `${userBName}'s Answer: ${answers[index]?.B || 'No answer'}\n\n`;
     });
+    history += '--- START OF CONVERSATION ---\n\n';
+    history += messages.map((m) => `${m.user}: ${m.text}`).join('\n');
+    return history;
+  };
+  
+  const handleGetAdvice = (isFollowUp = false) => {
+    const chatHistory = getFullChatHistory();
 
     startTransition(async () => {
-      const result = await getAIAdvice(context);
+      const result = await getAIAdvice(chatHistory);
       if (result.error) {
         toast({
           variant: 'destructive',
@@ -124,10 +136,49 @@ export function ChatClient() {
           description: result.error,
         });
       } else if (result.advice) {
-        setMessages([{ id: Date.now(), user: 'AI', text: result.advice }]);
-        setAppState('advice');
+        setMessages((prev) => [
+          ...prev,
+          { id: Date.now(), user: 'AI', text: result.advice },
+        ]);
+        if (!isFollowUp) {
+          setAppState('advice');
+        }
       }
     });
+  };
+
+  const handleSendMessage = () => {
+    if (input.trim() === '' || !activeUser) {
+        toast({
+            variant: 'destructive',
+            title: 'Cannot send message',
+            description: 'Please select a user and type a message.',
+        });
+        return;
+    }
+
+    const newMessage: Message = { id: Date.now(), user: activeUser, text: input };
+    setMessages((prev) => [...prev, newMessage]);
+    setInput('');
+
+    // We call handleGetAdvice with the new message already in the history
+    // by using a callback with setMessages's updater function
+    setMessages(currentMessages => {
+        const chatHistory = getFullChatHistory() + `\n${activeUser}: ${input}`;
+         startTransition(async () => {
+          const result = await getAIAdvice(chatHistory);
+          if (result.error) {
+            toast({
+              variant: 'destructive',
+              title: 'Error getting AI response',
+              description: result.error,
+            });
+          } else if (result.advice) {
+            setMessages((prev) => [...prev, { id: Date.now() + 1, user: 'AI', text: result.advice }]);
+          }
+        });
+        return currentMessages;
+    })
   };
 
   const startOver = () => {
@@ -136,6 +187,10 @@ export function ChatClient() {
     setAnswers({});
     setMessages([]);
     setAppState('topic');
+    setUserAName('User A');
+    setUserBName('User B');
+    setInput('');
+    setActiveUser(null);
   };
 
   return (
@@ -165,37 +220,54 @@ export function ChatClient() {
         </CardHeader>
 
         <ScrollArea className="flex-1" ref={scrollAreaRef}>
-          <CardContent className="p-6">
+          <CardContent className="p-6 flex flex-col min-h-full">
             {appState === 'topic' && (
               <div className="flex flex-col items-center justify-center h-full text-center gap-4">
                 <div className="p-4 bg-primary/20 rounded-full">
                   <MessageSquareQuote className="w-12 h-12 text-primary" />
                 </div>
                 <h2 className="text-2xl font-bold font-headline">
-                  What would you like to discuss?
+                  Let's Get Started
                 </h2>
-                <p className="text-muted-foreground max-w-md">
-                  Enter a topic like "Communication", "Finances", or "Future
-                  Plans" to get started. The AI will generate some questions
-                  to guide your conversation.
+                <p className="text-muted-foreground max-w-lg">
+                  First, enter your names. Then, provide a topic like "Communication", "Finances", or "Future
+                  Plans". The AI will generate some questions to guide your conversation.
                 </p>
-                <div className="flex w-full max-w-sm items-center space-x-2 mt-4">
-                  <Input
-                    type="text"
-                    placeholder="Enter your topic..."
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleGenerateQuestions()}
-                    disabled={isPending}
-                  />
-                  <Button onClick={handleGenerateQuestions} disabled={isPending}>
-                    {isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-2 h-4 w-4" />
-                    )}
-                    Generate Questions
-                  </Button>
+                <div className="w-full max-w-sm space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        type="text"
+                        placeholder="User A's Name"
+                        value={userAName === 'User A' ? '' : userAName}
+                        onChange={(e) => setUserAName(e.target.value || 'User A')}
+                        disabled={isPending}
+                      />
+                      <Input
+                        type="text"
+                        placeholder="User B's Name"
+                        value={userBName === 'User B' ? '' : userBName}
+                        onChange={(e) => setUserBName(e.target.value || 'User B')}
+                        disabled={isPending}
+                      />
+                  </div>
+                  <div className="flex w-full items-center space-x-2">
+                    <Input
+                      type="text"
+                      placeholder="Enter your topic..."
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleGenerateQuestions()}
+                      disabled={isPending}
+                    />
+                    <Button onClick={handleGenerateQuestions} disabled={isPending}>
+                      {isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                      )}
+                      Generate Questions
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -213,10 +285,10 @@ export function ChatClient() {
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor={`userA-${index}`}>User A's Answer</Label>
+                        <Label htmlFor={`userA-${index}`}>{userAName}'s Answer</Label>
                         <Textarea
                           id={`userA-${index}`}
-                          placeholder="User A, please write your answer here..."
+                          placeholder={`${userAName}, please write your answer here...`}
                           value={answers[index]?.A || ''}
                           onChange={(e) =>
                             handleAnswerChange(index, 'A', e.target.value)
@@ -225,10 +297,10 @@ export function ChatClient() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor={`userB-${index}`}>User B's Answer</Label>
+                        <Label htmlFor={`userB-${index}`}>{userBName}'s Answer</Label>
                         <Textarea
                           id={`userB-${index}`}
-                          placeholder="User B, please write your answer here..."
+                          placeholder={`${userBName}, please write your answer here...`}
                           value={answers[index]?.B || ''}
                           onChange={(e) =>
                             handleAnswerChange(index, 'B', e.target.value)
@@ -243,9 +315,9 @@ export function ChatClient() {
             )}
             
             {appState === 'advice' && (
-                 <div className="p-6 space-y-6">
+                 <div className="space-y-6 flex-1">
                     {messages.map((message) => (
-                        <ChatMessage key={message.id} message={message} />
+                        <ChatMessage key={message.id} message={message} userAName={userAName} userBName={userBName}/>
                     ))}
                 </div>
             )}
@@ -256,7 +328,7 @@ export function ChatClient() {
           <CardFooter className="border-t pt-6 flex-col items-center gap-4">
             {appState === 'questions' && (
               <Button
-                onClick={handleGetAdvice}
+                onClick={() => handleGetAdvice(false)}
                 disabled={isPending || !allQuestionsAnswered()}
                 size="lg"
               >
@@ -268,10 +340,45 @@ export function ChatClient() {
                 Get Counselor's Advice
               </Button>
             )}
-             {appState === 'advice' && (
-                <div className="text-center">
-                    <p className="text-muted-foreground">Would you like to discuss another topic?</p>
+            {appState === 'advice' && (
+              <div className="w-full space-y-4">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Replying as:</span>
+                     <Button 
+                        variant={activeUser === userAName ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setActiveUser(userAName)}
+                    >
+                        <User className="mr-2"/>
+                        {userAName}
+                    </Button>
+                     <Button 
+                        variant={activeUser === userBName ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setActiveUser(userBName)}
+                    >
+                         <User className="mr-2"/>
+                        {userBName}
+                    </Button>
                 </div>
+                <div className="flex w-full items-center space-x-2">
+                  <Input
+                    type="text"
+                    placeholder={`Type your message as ${activeUser || '...'} `}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    disabled={isPending || !activeUser}
+                  />
+                  <Button onClick={handleSendMessage} disabled={isPending || !activeUser}>
+                    {isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send />
+                    )}
+                  </Button>
+                </div>
+              </div>
             )}
           </CardFooter>
         )}
@@ -280,42 +387,34 @@ export function ChatClient() {
   );
 }
 
-function ChatMessage({ message }: { message: Message }) {
+function ChatMessage({ message, userAName, userBName }: { message: Message, userAName: string, userBName: string }) {
   const isAI = message.user === 'AI';
-  const isSystem = message.user === 'System';
-
-  if (isSystem) {
-    return (
-      <div className="text-center text-xs text-muted-foreground p-2 my-4 bg-muted rounded-md max-w-md mx-auto">
-        {message.text}
-      </div>
-    );
-  }
+  
+  const isUserA = message.user === userAName;
+  const isUserB = message.user === userBName;
+  const isUser = isUserA || isUserB;
 
   return (
-    <div className={cn('flex items-start gap-3')}>
-      {isAI && (
-        <div className="p-2 bg-primary/20 rounded-full">
-            <BrainCircuit className="w-5 h-5 text-primary" />
-        </div>
-      )}
+    <div className={cn('flex items-start gap-3', isUser && 'justify-end')}>
       <div
         className={cn(
-          'p-4 rounded-xl max-w-none text-sm shadow-md',
-          isAI &&
-            'bg-accent/30 border border-accent/50'
+          'flex flex-col gap-1',
+          isUser && 'items-end'
         )}
       >
-        {isAI && (
-          <p className="font-bold font-headline text-accent-foreground mb-2 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent-foreground" />
-            Counselor's Advice
+        <div
+          className={cn(
+            'p-4 rounded-xl max-w-xl text-sm shadow-md',
+            isAI && 'bg-accent/30 border border-accent/50',
+            isUser && 'bg-primary/20 text-primary-foreground'
+          )}
+        >
+          <p className="font-bold text-sm mb-1 text-foreground">
+            {isAI ? 'CounselorAI' : message.user}
           </p>
-        )}
-        <div className="prose prose-sm max-w-none break-words text-foreground">
-          {message.text.split('\n').map((paragraph, index) => (
-            <p key={index}>{paragraph}</p>
-          ))}
+          <div className="prose prose-sm max-w-none break-words text-foreground whitespace-pre-wrap">
+             {message.text}
+          </div>
         </div>
       </div>
     </div>
