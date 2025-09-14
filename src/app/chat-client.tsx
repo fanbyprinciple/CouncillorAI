@@ -135,7 +135,7 @@ export function ChatClient() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 p-0 overflow-hidden">
+        <CardContent className="flex-1 p-0 overflow-y-auto">
           <ScrollArea className="h-full" ref={scrollAreaRef}>
             <div className="p-6 space-y-6">
               {messages.map((message) => (
@@ -233,7 +233,7 @@ function ChatMessage({ message }: { message: Message }) {
             Counselor's Advice
           </p>
         )}
-        <p className="whitespace-pre-wrap">{message.text}</p>
+        <p className="whitespace-pre-line">{message.text}</p>
       </div>
       {isUserB && (
         <Avatar className="w-8 h-8 border">
