@@ -19,7 +19,11 @@ const GenerateActionableStepsInputSchema = z.object({
 export type GenerateActionableStepsInput = z.infer<typeof GenerateActionableStepsInputSchema>;
 
 const GenerateActionableStepsOutputSchema = z.object({
-  steps: z.string().describe('A bulleted list of actionable steps for the couple to take.'),
+  steps: z
+    .string()
+    .describe(
+      'A step-by-step, bulleted list of actionable steps for the couple to take. Each step should be a separate bullet point.'
+    ),
 });
 export type GenerateActionableStepsOutput = z.infer<typeof GenerateActionableStepsOutputSchema>;
 
@@ -33,7 +37,7 @@ const prompt = ai.definePrompt({
   name: 'generateActionableStepsPrompt',
   input: {schema: GenerateActionableStepsInputSchema},
   output: {schema: GenerateActionableStepsOutputSchema},
-  prompt: `You are an experienced marriage counselor. Based on the entire conversation history provided below, create a simple, clear, and actionable plan for the couple. Present this plan as a bulleted list.
+  prompt: `You are an experienced marriage counselor. Based on the entire conversation history provided below, create a simple, clear, and actionable plan for the couple. Present this plan as a bulleted list (using '*' or '-').
 
 Chat History:
 {{{chatHistory}}}`,
