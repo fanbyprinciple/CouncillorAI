@@ -22,12 +22,15 @@ import {
   FileQuestion,
   User,
   ListChecks,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { getAIAdvice, getInitialQuestions, getActionableSteps } from './actions';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 
 type Message = {
   id: number;
@@ -48,6 +51,7 @@ export function ChatClient() {
   const [input, setInput] = useState('');
   const [activeUser, setActiveUser] = useState<string | null>(null);
   const [appState, setAppState] = useState<AppState>('topic');
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -59,7 +63,7 @@ export function ChatClient() {
         behavior: 'smooth',
       });
     }
-  }, [messages, questions]);
+  }, [messages, questions, currentQuestionIndex]);
 
   const handleGenerateQuestions = () => {
     if (topic.trim().length < 3) {
@@ -81,6 +85,7 @@ export function ChatClient() {
       } else if (result.questions) {
         setQuestions(result.questions);
         setAppState('questions');
+        setCurrentQuestionIndex(0);
         setAnswers({});
         setMessages([]);
       }
@@ -99,6 +104,15 @@ export function ChatClient() {
         [user]: value,
       },
     }));
+  };
+
+  const isCurrentQuestionAnswered = () => {
+    const currentAnswers = answers[currentQuestionIndex];
+    return (
+      currentAnswers &&
+      currentAnswers.A?.trim() !== '' &&
+      currentAnswers.B?.trim() !== ''
+    );
   };
 
   const allQuestionsAnswered = () => {
@@ -124,7 +138,7 @@ export function ChatClient() {
     history += messages.map((m) => `${m.user}: ${m.text}`).join('\n');
     return history;
   };
-  
+
   const handleGetAdvice = () => {
     const chatHistory = getFullChatHistory();
 
@@ -176,9 +190,9 @@ export function ChatClient() {
     const newMessage: Message = { id: Date.now(), user: activeUser, text: input };
     setMessages((prev) => [...prev, newMessage]);
     setInput('');
-    
+
     const updatedHistory = getFullChatHistory() + `\n${activeUser}: ${input}`;
-    
+
     startTransition(async () => {
       const result = await getAIAdvice(updatedHistory);
       if (result.error) {
@@ -203,6 +217,7 @@ export function ChatClient() {
     setUserBName('User B');
     setInput('');
     setActiveUser(null);
+    setCurrentQuestionIndex(0);
   };
 
   return (
@@ -246,17 +261,17 @@ export function ChatClient() {
                   Plans". The AI will generate some questions to guide your conversation.
                 </p>
                 <div className="w-full max-w-sm space-y-4 mt-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input
                         type="text"
-                        placeholder="User A's Name"
+                        placeholder="Enter first name"
                         value={userAName === 'User A' ? '' : userAName}
                         onChange={(e) => setUserAName(e.target.value || 'User A')}
                         disabled={isPending}
                       />
                       <Input
                         type="text"
-                        placeholder="User B's Name"
+                        placeholder="Enter second name"
                         value={userBName === 'User B' ? '' : userBName}
                         onChange={(e) => setUserBName(e.target.value || 'User B')}
                         disabled={isPending}
@@ -284,48 +299,78 @@ export function ChatClient() {
               </div>
             )}
 
-            {appState === 'questions' && (
-              <div className="space-y-8">
-                <div className="text-center p-4 bg-muted rounded-lg">
+            {appState === 'questions' && questions.length > 0 && (
+              <div className="space-y-6">
+                 <div className="text-center p-4 bg-muted rounded-lg">
                     <h3 className="text-lg font-semibold flex items-center justify-center gap-2"><FileQuestion/> Here are some questions about "{topic}"</h3>
                     <p className="text-muted-foreground text-sm">Both partners should answer each question thoughtfully.</p>
                 </div>
-                {questions.map((q, index) => (
-                  <div key={index} className="space-y-4 p-4 border rounded-lg">
-                    <p className="font-semibold text-primary">
-                      {index + 1}. {q}
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor={`userA-${index}`}>{userAName}'s Answer</Label>
-                        <Textarea
-                          id={`userA-${index}`}
-                          placeholder={`${userAName}, please write your answer here...`}
-                          value={answers[index]?.A || ''}
-                          onChange={(e) =>
-                            handleAnswerChange(index, 'A', e.target.value)
-                          }
-                          className="min-h-[120px]"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`userB-${index}`}>{userBName}'s Answer</Label>
-                        <Textarea
-                          id={`userB-${index}`}
-                          placeholder={`${userBName}, please write your answer here...`}
-                          value={answers[index]?.B || ''}
-                          onChange={(e) =>
-                            handleAnswerChange(index, 'B', e.target.value)
-                          }
-                          className="min-h-[120px]"
-                        />
-                      </div>
+
+                <div className="space-y-2">
+                    <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} className="w-full" />
+                    <p className="text-center text-sm text-muted-foreground">Question {currentQuestionIndex + 1} of {questions.length}</p>
+                </div>
+
+                <div className="space-y-4 p-4 border rounded-lg shadow-sm">
+                  <p className="font-semibold text-primary text-lg">
+                    {questions[currentQuestionIndex]}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`userA-${currentQuestionIndex}`}>{userAName}'s Answer</Label>
+                      <Textarea
+                        id={`userA-${currentQuestionIndex}`}
+                        placeholder={`${userAName}, please write your answer here...`}
+                        value={answers[currentQuestionIndex]?.A || ''}
+                        onChange={(e) =>
+                          handleAnswerChange(currentQuestionIndex, 'A', e.target.value)
+                        }
+                        className="min-h-[150px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`userB-${currentQuestionIndex}`}>{userBName}'s Answer</Label>
+                      <Textarea
+                        id={`userB-${currentQuestionIndex}`}
+                        placeholder={`${userBName}, please write your answer here...`}
+                        value={answers[currentQuestionIndex]?.B || ''}
+                        onChange={(e) =>
+                          handleAnswerChange(currentQuestionIndex, 'B', e.target.value)
+                        }
+                        className="min-h-[150px]"
+                      />
                     </div>
                   </div>
-                ))}
+                </div>
+
+                <div className="flex justify-between items-center">
+                    <Button variant="outline" onClick={() => setCurrentQuestionIndex(i => i - 1)} disabled={currentQuestionIndex === 0}>
+                        <ArrowLeft className="mr-2"/>
+                        Previous
+                    </Button>
+                    {currentQuestionIndex < questions.length - 1 ? (
+                        <Button onClick={() => setCurrentQuestionIndex(i => i + 1)} disabled={!isCurrentQuestionAnswered()}>
+                            Next
+                            <ArrowRight className="ml-2"/>
+                        </Button>
+                    ) : (
+                        <Button
+                            onClick={() => handleGetAdvice()}
+                            disabled={isPending || !allQuestionsAnswered()}
+                            size="lg"
+                        >
+                            {isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            )}
+                            Get Counselor's Advice
+                        </Button>
+                    )}
+                </div>
               </div>
             )}
-            
+
             {(appState === 'advice' || appState === 'ended') && (
                  <div className="space-y-6 flex-1">
                     {messages.map((message) => (
@@ -342,31 +387,16 @@ export function ChatClient() {
           </CardContent>
         </ScrollArea>
 
-        {(appState !== 'topic' && appState !== 'ended') && (
+        {(appState === 'advice') && (
           <CardFooter className="border-t pt-6 flex-col items-center gap-4">
-            {appState === 'questions' && (
-              <Button
-                onClick={() => handleGetAdvice()}
-                disabled={isPending || !allQuestionsAnswered()}
-                size="lg"
-              >
-                {isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                Get Counselor's Advice
-              </Button>
-            )}
-            {appState === 'advice' && (
-              <div className="w-full space-y-4">
-                 <Button onClick={handleGetActionableSteps} disabled={isPending} variant="outline" size="lg" className="w-full">
-                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}
-                    Get Actionable Steps
+            <div className="w-full space-y-4">
+                <Button onClick={handleGetActionableSteps} disabled={isPending} variant="outline" size="lg" className="w-full">
+                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}
+                Get Actionable Steps
                 </Button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">Replying as:</span>
-                     <Button 
+                     <Button
                         variant={activeUser === userAName ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setActiveUser(userAName)}
@@ -374,7 +404,7 @@ export function ChatClient() {
                         <User className="mr-2"/>
                         {userAName}
                     </Button>
-                     <Button 
+                     <Button
                         variant={activeUser === userBName ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setActiveUser(userBName)}
@@ -401,7 +431,6 @@ export function ChatClient() {
                   </Button>
                 </div>
               </div>
-            )}
           </CardFooter>
         )}
       </Card>
@@ -412,7 +441,7 @@ export function ChatClient() {
 function ChatMessage({ message, userAName, userBName }: { message: Message, userAName: string, userBName: string }) {
   const isAI = message.user === 'AI';
   const isActionPlan = message.user === 'AI Action Plan';
-  
+
   const isUserA = message.user === userAName;
   const isUserB = message.user === userBName;
   const isUser = isUserA || isUserB;
@@ -435,7 +464,7 @@ function ChatMessage({ message, userAName, userBName }: { message: Message, user
           <p className="font-bold text-sm mb-1 text-foreground flex items-center gap-2">
             {isActionPlan ? <><ListChecks/> Action Plan</> : isAI ? 'CounselorAI' : message.user}
           </p>
-          <div className="prose prose-sm max-w-none break-words text-foreground whitespace-pre-wrap">
+          <div className="prose prose-sm max-w-none break-words text-foreground">
              {message.text}
           </div>
         </div>
