@@ -135,7 +135,7 @@ export function ChatClient() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex-grow p-0">
+        <CardContent className="flex-1 p-0 overflow-hidden">
           <ScrollArea className="h-full" ref={scrollAreaRef}>
             <div className="p-6 space-y-6">
               {messages.map((message) => (
