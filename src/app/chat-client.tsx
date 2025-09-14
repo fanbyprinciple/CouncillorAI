@@ -45,8 +45,8 @@ type AppState = 'names' | 'questions' | 'advice' | 'ended';
 type Answers = Record<number, {A?: string; B?: string}>;
 
 const STATIC_QUESTIONS = [
-  'What is the problem, according to you?',
-  'Please provide a specific, recent example of when this problem occurred.',
+  'Can you both please explain the challenge or problem you are facing?',
+  'Please provide a specific, recent example when this occurred.',
 ];
 
 export function ChatClient() {
