@@ -1,6 +1,21 @@
 # CounselorAI
 
+![CounselorAI Logo](https://placehold.co/600x200/D1C4E9/4A148C?text=CounselorAI&font=ptsans)
+
+The app is deployed at https://councillor-ai.vercel.app/
+
 CounselorAI is a web application built with Next.js and Firebase Genkit that provides a structured, AI-powered space for couples to discuss relationship issues. The application guides users through a multi-step conversation, from defining the problem to receiving a concrete action plan, all facilitated by a generative AI acting as a marriage counselor.
+
+## Screenshots
+
+| Step 1: Enter Names | Step 2: Answer Questions |
+| :---: | :---: |
+| ![Enter Names](https://placehold.co/400x300/F5F5F5/333333?text=Name+Input+Screen) | ![Answer Questions](https://placehold.co/400x300/F5F5F5/333333?text=Question+Screen) |
+
+| Step 3: Interactive Chat | Step 4: Action Plan |
+| :---: | :---: |
+| ![Interactive Chat](https://placehold.co/400x300/F5F5F5/333333?text=Chat+Interface) | ![Action Plan](https://placehold.co/400x300/F5F5F5/333333?text=Action+Plan+View) |
+
 
 ## Tech Stack
 
