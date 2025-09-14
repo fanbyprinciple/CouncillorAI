@@ -220,7 +220,7 @@ function ChatMessage({ message }: { message: Message }) {
       )}
       <div
         className={cn(
-          'p-3 rounded-xl max-w-xs md:max-w-md lg:max-w-lg text-sm shadow-md',
+          'p-3 rounded-xl max-w-xs md:max-w-md lg:max-w-lg text-sm shadow-md break-words',
           isUserA && 'bg-card border',
           isUserB && 'bg-primary text-primary-foreground',
           isAI &&
