@@ -30,7 +30,7 @@ const GenerateFollowUpQuestionsOutputSchema = z.object({
   questions: z
     .array(z.string())
     .describe(
-      'An array of 3 to 5 open-ended follow-up questions to help understand the core issue.'
+      'An array of up to 3 open-ended follow-up questions to help understand the core issue. Each question must be answerable by both users.'
     ),
 });
 
@@ -50,7 +50,7 @@ const prompt = ai.definePrompt({
   output: {schema: GenerateFollowUpQuestionsOutputSchema},
   prompt: `You are an AI relationship counselor. Your goal is to understand the root of a problem between two partners. You have their initial statements and a specific example from each.
 
-Based on this information, generate 3 to 5 open-ended follow-up questions to probe deeper into their feelings, communication patterns, and underlying needs. The questions should encourage reflection, not place blame.
+Based on this information, generate a maximum of 3 open-ended follow-up questions to probe deeper into their feelings, communication patterns, and underlying needs. The questions should encourage reflection, not place blame, and must be phrased so that both partners can answer them.
 
 User A's problem: {{{problemA}}}
 User A's example: {{{exampleA}}}
