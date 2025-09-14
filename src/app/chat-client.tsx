@@ -466,6 +466,11 @@ export function ChatClient() {
                 )}
                 End Session
               </Button>
+              <div className="text-center p-4 bg-muted rounded-lg w-full">
+                <p className="text-sm text-muted-foreground">
+                  The initial advice has been provided. You can now ask follow-up questions or continue the conversation with the counselor.
+                </p>
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">Replying as:</span>
                 <Button
