@@ -223,7 +223,8 @@ function ChatMessage({ message }: { message: Message }) {
           'p-3 rounded-xl max-w-xs md:max-w-md lg:max-w-lg text-sm shadow-md',
           isUserA && 'bg-card border',
           isUserB && 'bg-primary text-primary-foreground',
-          isAI && 'bg-accent/30 border border-accent/50 w-full'
+          isAI &&
+            'bg-accent/30 border border-accent/50 max-w-none md:max-w-none lg:max-w-none'
         )}
       >
         {isAI && (
