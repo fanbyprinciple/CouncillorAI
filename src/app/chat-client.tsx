@@ -21,8 +21,9 @@ import {
   MessageSquareQuote,
   FileQuestion,
   User,
+  ListChecks,
 } from 'lucide-react';
-import { getAIAdvice, getInitialQuestions } from './actions';
+import { getAIAdvice, getInitialQuestions, getActionableSteps } from './actions';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,7 +35,7 @@ type Message = {
   text: string;
 };
 
-type AppState = 'topic' | 'questions' | 'advice';
+type AppState = 'topic' | 'questions' | 'advice' | 'ended';
 type Answers = Record<number, { A?: string; B?: string }>;
 
 export function ChatClient() {
@@ -124,7 +125,7 @@ export function ChatClient() {
     return history;
   };
   
-  const handleGetAdvice = (isFollowUp = false) => {
+  const handleGetAdvice = () => {
     const chatHistory = getFullChatHistory();
 
     startTransition(async () => {
@@ -140,12 +141,27 @@ export function ChatClient() {
           ...prev,
           { id: Date.now(), user: 'AI', text: result.advice },
         ]);
-        if (!isFollowUp) {
-          setAppState('advice');
-        }
+        setAppState('advice');
       }
     });
   };
+
+  const handleGetActionableSteps = () => {
+    const chatHistory = getFullChatHistory();
+    startTransition(async () => {
+        const result = await getActionableSteps(chatHistory);
+        if (result.error) {
+            toast({
+                variant: 'destructive',
+                title: 'Error getting actionable steps',
+                description: result.error,
+            });
+        } else if (result.steps) {
+            setMessages(prev => [...prev, {id: Date.now(), user: 'AI Action Plan', text: result.steps}]);
+            setAppState('ended');
+        }
+    });
+  }
 
   const handleSendMessage = () => {
     if (input.trim() === '' || !activeUser) {
@@ -160,25 +176,21 @@ export function ChatClient() {
     const newMessage: Message = { id: Date.now(), user: activeUser, text: input };
     setMessages((prev) => [...prev, newMessage]);
     setInput('');
-
-    // We call handleGetAdvice with the new message already in the history
-    // by using a callback with setMessages's updater function
-    setMessages(currentMessages => {
-        const chatHistory = getFullChatHistory() + `\n${activeUser}: ${input}`;
-         startTransition(async () => {
-          const result = await getAIAdvice(chatHistory);
-          if (result.error) {
-            toast({
-              variant: 'destructive',
-              title: 'Error getting AI response',
-              description: result.error,
-            });
-          } else if (result.advice) {
-            setMessages((prev) => [...prev, { id: Date.now() + 1, user: 'AI', text: result.advice }]);
-          }
+    
+    const updatedHistory = getFullChatHistory() + `\n${activeUser}: ${input}`;
+    
+    startTransition(async () => {
+      const result = await getAIAdvice(updatedHistory);
+      if (result.error) {
+        toast({
+          variant: 'destructive',
+          title: 'Error getting AI response',
+          description: result.error,
         });
-        return currentMessages;
-    })
+      } else if (result.advice) {
+        setMessages((prev) => [...prev, { id: Date.now() + 1, user: 'AI', text: result.advice }]);
+      }
+    });
   };
 
   const startOver = () => {
@@ -314,21 +326,27 @@ export function ChatClient() {
               </div>
             )}
             
-            {appState === 'advice' && (
+            {(appState === 'advice' || appState === 'ended') && (
                  <div className="space-y-6 flex-1">
                     {messages.map((message) => (
                         <ChatMessage key={message.id} message={message} userAName={userAName} userBName={userBName}/>
                     ))}
+                     {appState === 'ended' && (
+                        <div className="text-center p-4 bg-primary/10 rounded-lg text-primary-foreground">
+                            <p className="font-semibold text-primary">The conversation has ended.</p>
+                            <p className="text-sm text-muted-foreground">We hope this session was helpful. You can start over to begin a new session.</p>
+                        </div>
+                    )}
                 </div>
             )}
           </CardContent>
         </ScrollArea>
 
-        {(appState === 'questions' || appState === 'advice') && (
+        {(appState !== 'topic' && appState !== 'ended') && (
           <CardFooter className="border-t pt-6 flex-col items-center gap-4">
             {appState === 'questions' && (
               <Button
-                onClick={() => handleGetAdvice(false)}
+                onClick={() => handleGetAdvice()}
                 disabled={isPending || !allQuestionsAnswered()}
                 size="lg"
               >
@@ -342,6 +360,10 @@ export function ChatClient() {
             )}
             {appState === 'advice' && (
               <div className="w-full space-y-4">
+                 <Button onClick={handleGetActionableSteps} disabled={isPending} variant="outline" size="lg" className="w-full">
+                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}
+                    Get Actionable Steps
+                </Button>
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Replying as:</span>
                      <Button 
@@ -389,6 +411,7 @@ export function ChatClient() {
 
 function ChatMessage({ message, userAName, userBName }: { message: Message, userAName: string, userBName: string }) {
   const isAI = message.user === 'AI';
+  const isActionPlan = message.user === 'AI Action Plan';
   
   const isUserA = message.user === userAName;
   const isUserB = message.user === userBName;
@@ -405,12 +428,12 @@ function ChatMessage({ message, userAName, userBName }: { message: Message, user
         <div
           className={cn(
             'p-4 rounded-xl max-w-xl text-sm shadow-md',
-            isAI && 'bg-accent/30 border border-accent/50',
+            (isAI || isActionPlan) && 'bg-accent/30 border border-accent/50',
             isUser && 'bg-primary/20 text-primary-foreground'
           )}
         >
-          <p className="font-bold text-sm mb-1 text-foreground">
-            {isAI ? 'CounselorAI' : message.user}
+          <p className="font-bold text-sm mb-1 text-foreground flex items-center gap-2">
+            {isActionPlan ? <><ListChecks/> Action Plan</> : isAI ? 'CounselorAI' : message.user}
           </p>
           <div className="prose prose-sm max-w-none break-words text-foreground whitespace-pre-wrap">
              {message.text}

@@ -22,7 +22,7 @@ export type GenerateInitialQuestionsInput = z.infer<
 const GenerateInitialQuestionsOutputSchema = z.object({
   questions: z
     .array(z.string())
-    .describe('An array of initial questions based on the topic.'),
+    .describe('An array of 4 initial questions based on the topic.'),
 });
 
 export type GenerateInitialQuestionsOutput = z.infer<
@@ -39,9 +39,9 @@ const prompt = ai.definePrompt({
   name: 'generateInitialQuestionsPrompt',
   input: {schema: GenerateInitialQuestionsInputSchema},
   output: {schema: GenerateInitialQuestionsOutputSchema},
-  prompt: `You are an AI that generates initial questions based on a topic.
+  prompt: `You are an AI that generates initial questions based on a topic for relationship counseling.
 
-  Generate a few questions based on the provided topic that two partners can answer to start a conversation about the topic.
+  Generate exactly 4 open-ended questions based on the provided topic that two partners can answer to start a conversation about the topic. Do not include a question about specific examples, as that will be added separately.
 
   Topic: {{{topic}}}
   `,

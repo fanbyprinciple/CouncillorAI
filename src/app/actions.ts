@@ -2,6 +2,7 @@
 
 import { generateCounselorAdvice } from '@/ai/flows/generate-counselor-advice';
 import { generateInitialQuestions } from '@/ai/flows/generate-initial-questions';
+import { generateActionableSteps } from '@/ai/flows/generate-actionable-steps';
 import { z } from 'zod';
 
 const adviceSchema = z.object({
@@ -39,9 +40,37 @@ export async function getInitialQuestions(topic: string): Promise<{ questions: s
             return { error: 'The AI returned an unexpected response for questions. Please try again.' };
         }
 
-        return { questions: parsedResult.data.questions };
+        const finalQuestions = [...parsedResult.data.questions];
+        // Ensure the specific question is always included.
+        const specificQuestion = "Please provide a specific example of a time you felt wronged or misunderstood in this situation.";
+        if (!finalQuestions.includes(specificQuestion)) {
+            finalQuestions.push(specificQuestion);
+        }
+
+        return { questions: finalQuestions };
     } catch (error) {
         console.error('Error getting initial questions:', error);
         return { error: 'An error occurred while getting initial questions from the AI.' };
+    }
+}
+
+const actionableStepsSchema = z.object({
+    steps: z.string(),
+});
+
+export async function getActionableSteps(chatHistory: string): Promise<{ steps: string; error?: undefined } | { steps?: undefined; error: string }> {
+    try {
+        const result = await generateActionableSteps({ chatHistory });
+        const parsedResult = actionableStepsSchema.safeParse(result);
+
+        if (!parsedResult.success) {
+            console.error('Invalid AI response shape for actionable steps:', parsedResult.error);
+            return { error: 'The AI returned an unexpected response for actionable steps. Please try again.' };
+        }
+
+        return { steps: parsedResult.data.steps };
+    } catch (error) {
+        console.error('Error getting actionable steps:', error);
+        return { error: 'An error occurred while getting actionable steps from the AI.' };
     }
 }
